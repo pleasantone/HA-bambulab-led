@@ -1,10 +1,25 @@
+# source_url: https://gist.github.com/dreed47/b33a76472cc813f7bf48a63c3dde7dce
+alias: Bambu Lab External Light Controller
+description: 'Control additional lights based on printer status'
+mode: single
+
 blueprint:
-  name: Bambu Lab WLED Controller
-  description: Control one or more WLED lights with Bambu 3d printer
+  name: Bambu Lab External Light Controller
+  description: Control one or more lights based upon BambuLab X1C/P1S 3D printer
   domain: automation
   input:
+    printer_online:
+      name: Printer Online
+      description: Select the printer online state binary sensor.
+      selector:
+        entity:
+          filter:
+          - domain:
+            - binary_sensor
+            integration: bambu_lab
+          multiple: false
     printer_status:
-      name: Print Status of your Bambu Lab printer
+      name: Printing Status
       description: Select the print status entity.
       selector:
         entity:
@@ -14,7 +29,7 @@ blueprint:
             integration: bambu_lab
           multiple: false
     printer_stage:
-      name: Current Stage of your Bambu Lab Printer
+      name: Print Stage
       description: Select the printer current stage entity.
       selector:
         entity:
@@ -23,81 +38,88 @@ blueprint:
             - sensor
             integration: bambu_lab
           multiple: false
-    printer_state:
-      name: Printer state On/Off of your Bambu Lab Printer
-      description: Select the printer state binary sensor.
+    printer_chamber_light:
+      name: Internal Chamber Light
+      description: Select the printer chamber light.
       selector:
         entity:
           filter:
           - domain:
-            - binary_sensor
+            - light
             integration: bambu_lab
           multiple: false
-    wled_lights:
-      name: WLED Light devices
-      description: Select the WLED light devices you wish to control.
+    target_lights:
+      name: Switched External Lights
+      description: Select the lights you wish to control.
       selector:
-        device:
-          filter:
-          - integration: wled
-          multiple: true
-  source_url: https://gist.github.com/dreed47/b33a76472cc813f7bf48a63c3dde7dce
-alias: Bambu Lab WLED Controller
-description: ''
-trigger:
-- platform: state
+        entity:
+        - domain:
+          - light
+        multiple: true
+
+triggers:
+- trigger: state
   entity_id:
-  - !input printer_state
+  - !input printer_online
   - !input printer_status
   - !input printer_stage
-  alias: When printer stage,status or state changes
-condition: []
-action:
+  - !input printer_chamber_light
+  alias: Trigger whenever printer stage, status, chamber light, or online state changes
+
+actions:
 - delay:
-    hours: 0
-    minutes: 0
-    seconds: 5
-    milliseconds: 0
-- if:
-  - condition: state
-    state: 'on'
-    alias: printer state is on
-    entity_id: !input printer_state
-  - condition: not
-    conditions:
-    - condition: state
-      entity_id: !input printer_stage
-      state: scanning_bed_surface
-      alias: scanning Bed Surface
-    - condition: state
-      entity_id: !input printer_stage
-      state: cleaning_nozzle_tip
-      alias: cleaning Nozzle Tip
-    - condition: state
-      entity_id: !input printer_stage
-      state: calibrating_extrusion
-      alias: calibrating Extrusion
-    - condition: state
-      entity_id: !input printer_status
-      state: offline
-      alias: Printer is off
-    alias: And Lidar is NOT on
-  then:
-  - service: light.turn_on
-    data:
-      rgb_color:
-      - 255
-      - 255
-      - 255
-      brightness_pct: 100
-      effect: Freqmatrix
-    alias: Turn WLED light on white with effect
-    target:
-      device_id: !input wled_lights
-  - choose:
-    - conditions:
-      - condition: or
-        conditions:
+  hours: 0
+  minutes: 0
+  seconds: 5
+  milliseconds: 0
+- choose:
+  - conditions:
+    - alias: Printer is offline, check again in 15secs and if so, turn lights off
+      condition: state
+      state: 'off'
+      entity_id: !input printer_online
+      sequence:
+      - delay: "00:00:15"
+      - if:
+        - condition: state
+          state: 'off'
+          entity_id: !input printer_online
+          for:
+            hours: 0
+            minutes: 0
+            seconds: 10
+        then:
+        - action: light.turn_off
+          target:
+            entity_id: !input target_lights
+          alias: Turn LED lights off
+    - alias: LIDAR is not on, follow chamber light
+      condition: not
+      conditions:
+        - condition: state
+          entity_id: !input printer_stage
+          state: scanning_bed_surface
+          alias: Scanning Bed Surface
+        - condition: state
+          entity_id: !input printer_stage
+          state: cleaning_nozzle_tip
+          alias: Cleaning Nozzle Tip
+        - condition: state
+          entity_id: !input printer_stage
+          state: calibrating_extrusion
+          alias: Calibrating Extrusion
+        - condition: state
+          entity_id: !input printer_status
+          state: offline
+          alias: Printer is offline
+      sequence:
+      - alias: Turn LED lights off
+        action: light.turn_off
+        target:
+          entity_id: !input target_lights
+    - alias: Printer needs service, lights on, ignore chamber light
+      condition: or
+      conditions:
         - condition: state
           entity_id: !input printer_stage
           state: paused_filament_runout
@@ -120,185 +142,72 @@ action:
           entity_id: !input printer_stage
           state: paused_first_layer_error
       sequence:
-      - service: light.turn_on
-        data:
-          rgb_color:
-          - 255
-          - 0
-          - 0
-          brightness: 255
-          effect: Blink
+      - action: light.turn_on
         target:
-          device_id: !input wled_lights
-        alias: Turn on Wled to red
-    alias: Do we need to set color to red?
-  - choose:
-    - conditions:
-      - condition: or
-        conditions:
-        - condition: state
-          entity_id: !input printer_stage
-          state: idle
+          entity_id: !input target_lights
+    - alias: Printer idle, lights follow chamber light
+      condition: state
+      entity_id: !input printer_stage
+      state: idle
       sequence:
-      - service: light.turn_on
-        data:
-          rgb_color:
-          - 255
-          - 0
-          - 195
-          brightness: 200
-          effect: Oscillate
+      - action: light.turn_on
         target:
-          device_id: !input wled_lights
-        alias: Turn on Wled to fushia with oscillate effect
-    alias: Do we need to set color to white?
-  - choose:
-    - conditions:
-      - condition: or
-        conditions:
-        - condition: state
-          entity_id: !input printer_stage
-          state: printing
+          entity_id: !input target_lights
+    - alias: Printer printing, lights follow chamber light
+      condition: state
+      entity_id: !input printer_stage
+      state: printing
       sequence:
-      - service: light.turn_on
-        data:
-          rgb_color:
-          - 255
-          - 255
-          - 255
-          brightness: 255
-          effect: Solid
+      - action: light.turn_on
         target:
-          device_id: !input wled_lights
-        alias: Turn on Wled to full white while printing
-    alias: Do we need to set color to white?
-  - choose:
-    - conditions:
-      - condition: or
-        conditions:
-        - condition: state
-          entity_id: !input printer_stage
-          state: filament_unloading
-        - condition: state
-          entity_id: !input printer_stage
-          state: filament_loading
-      sequence:
-      - service: light.turn_on
-        data:
-          rgb_color:
-          - 255
-          - 255
-          - 255
-          brightness: 255
-          effect: Solid
-        target:
-          device_id: !input wled_lights
-        alias: Turn on Wled to white to check if loading/unloading is ok
-    alias: Do we need to set color to white?
-  - choose:
-    - conditions:
-      - condition: or
-        conditions:
-        - condition: state
-          entity_id: !input printer_status
-          state: finish
-      sequence:
-      - service: light.turn_on
-        data:
-          rgb_color:
-          - 0
-          - 255
-          - 0
-          brightness: 255
-          effect: Solid
-        target:
-          device_id: !input wled_lights
-        alias: Turn on Wled to green
-    alias: Do we need to set color to green?
-  - choose:
-    - conditions:
-      - condition: or
-        conditions:
-        - condition: state
-          entity_id: !input printer_status
-          state: pause
-      sequence:
-      - service: light.turn_on
-        data:
-          rgb_color:
-          - 0
-          - 255
-          - 0
-          brightness: 255
-          effect: Blink
-        target:
-          device_id: !input wled_lights
-        alias: Turn on Wled to green with blink effect
-    alias: Do we need to set color to green?
-  - choose:
-    - conditions:
-      - condition: or
-        conditions:
-        - condition: state
-          entity_id: !input printer_stage
-          state: auto_bed_leveling
-      sequence:
-      - service: light.turn_on
-        data:
-          rgb_color:
-          - 0
-          - 0
-          - 255
-          brightness: 255
-          effect: Blink
-        target:
-          device_id: !input wled_lights
-        alias: Turn on Wled to blue
-    alias: Do we need to set color to blue?
-  - choose:
-    - conditions:
-      - condition: or
-        conditions:
-        - condition: state
-          entity_id: !input printer_stage
-          state: heatbed_preheating
-        - condition: state
-          entity_id: !input printer_stage
-          state: Heating Hotend
-      sequence:
-      - service: light.turn_on
-        data:
-          rgb_color:
-          - 255
-          - 169
-          - 0
-          brightness: 255
-          effect: Blink
-        target:
-          device_id: !input wled_lights
-        alias: Turn on Wled to yellow
-    alias: Do we need to set color to yellow?
-  else:
-    - if:
+          entity_id: !input target_lights
+    - alias: AMS loading/unloading, lights follow chamber light
+      condition: or
+      conditions:
       - condition: state
-        state: 'off'
-        alias: printer state is off for 15 sec
-        entity_id: !input printer_state
-      then:
-      - delay: "00:00:15"
-      - if:
-        - condition: state
-          state: 'off'
-          entity_id: !input printer_state
-          for:
-            hours: 0
-            minutes: 0
-            seconds: 10
-        then:
-        - service: light.turn_off
-          data: {}
-          target:
-            device_id: !input wled_lights
-          alias: Turn WLED light off
-mode: single
-
+        entity_id: !input printer_stage
+        state: filament_unloading
+      - condition: state
+        entity_id: !input printer_stage
+        state: filament_loading
+      sequence:
+      - action: light.turn_on
+        target:
+          entity_id: !input target_lights
+    - alias: Printing finished, lights follow chamber light
+      condition: state
+      entity_id: !input printer_status
+      state: finish
+      sequence:
+      - action: light.turn_on
+        target:
+          entity_id: !input target_lights
+    - alias: Printing paused, lights on, ignore chamber light
+      condition: state
+      entity_id: !input printer_status
+      state: pause
+      sequence:
+      - action: light.turn_on
+        target:
+          entity_id: !input target_lights
+    - alias: Automatic Bed Leveling, lights follow chamber light
+      condition: state
+      entity_id: !input printer_stage
+      state: auto_bed_leveling
+      sequence:
+      - action: light.turn_on
+        target:
+          entity_id: !input target_lights
+    - alias: Bed preheating, lights follow chamber light
+      condition: or
+      conditions:
+      - condition: state
+        entity_id: !input printer_stage
+        state: heatbed_preheating
+      - condition: state
+        entity_id: !input printer_stage
+        state: Heating Hotend
+      sequence:
+      - action: light.turn_on
+        target:
+          entity_id: !input target_lights
