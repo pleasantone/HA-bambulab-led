@@ -1,7 +1,7 @@
 # source_url: https://gist.github.com/dreed47/b33a76472cc813f7bf48a63c3dde7dce
 alias: Bambu Lab External Light Controller
 description: Control additional lights based on printer status
-mode: single
+mode: restart
 
 blueprint:
   name: Bambu Lab External Light Controller
@@ -68,7 +68,10 @@ triggers:
       - !input printer_chamber_light
 
 action:
-  - delay: "00:00:05"
+  - variables:
+      chamber_lights:
+        - !input printer_chamber_light
+#  - delay: "00:00:05"
   - choose:
       - alias: Printer is offline, check again in 15secs and if so, turn lights off
         conditions:
@@ -85,59 +88,37 @@ action:
                 for: "00:00:10"
             then:
               - alias: Turn LED lights off, ignore chamber light
-                action: light.turn_{{ printer_chamber_light.state }}
+                action: light.turn_off
                 target:
                   entity_id: !input target_lights
-      - alias: LIDAR is not on, follow chamber light
+      - alias: LIDAR is on, turn off chamber light
         conditions:
-            condition: not
-            conditions:
-              - condition: state
-                entity_id: !input printer_stage
-                state: scanning_bed_surface
-                alias: Scanning Bed Surface
-              - condition: state
-                entity_id: !input printer_stage
-                state: cleaning_nozzle_tip
-                alias: Cleaning Nozzle Tip
-              - condition: state
-                entity_id: !input printer_stage
-                state: calibrating_extrusion
-                alias: Calibrating Extrusion
-              - condition: state
-                entity_id: !input printer_status
-                state: offline
-                alias: Printer is offline
+            condition: state
+            entity_id: !input printer_stage
+            state:
+              - scanning_bed_surface
+              - cleaning_nozzle_tip
+              - calibrating_extrusion
         sequence:
-          - alias: Turn LED lights off
             action: light.turn_off
             target:
               entity_id: !input target_lights
-      - alias: Printer needs service, lights on, ignore chamber light
+      - alias: Printer needs attention, lights on
         conditions:
-            condition: or
-            conditions:
-              - condition: state
-                entity_id: !input printer_stage
-                state: paused_filament_runout
-              - condition: state
-                entity_id: !input printer_stage
-                state: paused_front_cover_falling
-              - condition: state
-                entity_id: !input printer_stage
-                state: paused_nozzle_temperature_malfunction
-              - condition: state
-                entity_id: !input printer_stage
-                state: paused_heat_bed_temperature_malfunction
-              - condition: state
-                entity_id: !input printer_stage
-                state: paused_chamber_temperature_control_error
-              - condition: state
-                entity_id: !input printer_stage
-                state: paused_cutter_error
-              - condition: state
-                entity_id: !input printer_stage
-                state: paused_first_layer_error
+            condition: state
+            entity_id: !input printer_stage
+            state:
+              - m400_pause
+              - paused_chamber_temperature_control_error
+              - paused_cutter_error
+              - paused_filament_runout
+              - paused_first_layer_error
+              - paused_front_cover_failing
+              - paused_heat_bed_temperature_malfunction
+              - paused_low_fan_speed_heat_break
+              - paused_nozzle_clog
+              - paused_nozzle_filament_covered_detected
+              - paused_nozzle_temperature_malfunction
         sequence:
           - action: light.turn_on
             target:
@@ -146,44 +127,25 @@ action:
         conditions:
             condition: state
             entity_id: !input printer_stage
-            state: idle
+            state:
+              - idle
+              - finish
         sequence:
           - action: light.turn_on
             target:
               entity_id: !input target_lights
-      - alias: Printer printing, lights follow chamber light
+      - alias: Printing or AMS loading/unloading, lights follow chamber light
         conditions:
             condition: state
             entity_id: !input printer_stage
-            state: printing
+            state:
+              - printing
+              - filament_unloading
+              - filament_loading
         sequence:
           - action: light.turn_on
             target:
               entity_id: !input target_lights
-      - alias: AMS loading/unloading, lights follow chamber light
-        conditions:
-            condition: or
-            conditions:
-              - condition: state
-                entity_id: !input printer_stage
-                state: filament_unloading
-              - condition: state
-                entity_id: !input printer_stage
-                state: filament_loading
-        sequence:
-          - action: light.turn_on
-            target:
-              entity_id: !input target_lights
-      - conditions:
-          - alias: Printing finished, lights follow chamber light
-            condition: state
-            entity_id: !input printer_status
-            state: finish
-        sequence:
-          - action: light.turn_on
-            target:
-              entity_id: !input target_lights
-
       - alias: Printing paused, lights on, ignore chamber light
         conditions:
             condition: state
@@ -193,25 +155,14 @@ action:
           - action: light.turn_on
             target:
               entity_id: !input target_lights
-      - alias: Automatic Bed Leveling, lights follow chamber light
+      - alias: Automatic Bed Leveling, or bed preheating, lights follow chamber light
         conditions:
             condition: state
             entity_id: !input printer_stage
-            state: auto_bed_leveling
-        sequence:
-          - action: light.turn_on
-            target:
-              entity_id: !input target_lights
-      - alias: Bed preheating, lights follow chamber light
-        conditions:
-          - condition: or
-            conditions:
-              - condition: state
-                entity_id: !input printer_stage
-                state: heatbed_preheating
-              - condition: state
-                entity_id: !input printer_stage
-                state: Heating Hotend
+            state:
+              - auto_bed_leveling
+              - heatbed_preheating
+              - heating_hotend
         sequence:
           - action: light.turn_on
             target:
