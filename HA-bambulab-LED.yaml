@@ -53,9 +53,10 @@ blueprint:
       description: Select the lights you wish to control.
       selector:
         entity:
-        - domain:
-          - light
-        multiple: true
+          filter:
+          - domain:
+            - light
+          multiple: true
 
 triggers:
 - trigger: state
@@ -67,32 +68,29 @@ triggers:
   alias: Trigger whenever printer stage, status, chamber light, or online state changes
 
 actions:
-- delay:
-  hours: 0
-  minutes: 0
-  seconds: 5
-  milliseconds: 0
+- delay: "00:00:05"
 - choose:
   - conditions:
     - alias: Printer is offline, check again in 15secs and if so, turn lights off
       condition: state
-      state: 'off'
       entity_id: !input printer_online
+      state: 'off'
       sequence:
       - delay: "00:00:15"
       - if:
-        - condition: state
-          state: 'off'
+        - alias: Printer offline after 15 seconds
+          condition: state
           entity_id: !input printer_online
+          state: 'off'
           for:
             hours: 0
             minutes: 0
             seconds: 10
         then:
-        - action: light.turn_off
+        - alias: Turn LED lights off, ignore chamber light
+          action: light.turn_off
           target:
             entity_id: !input target_lights
-          alias: Turn LED lights off
     - alias: LIDAR is not on, follow chamber light
       condition: not
       conditions:
