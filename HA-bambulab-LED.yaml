@@ -8,8 +8,8 @@ blueprint:
   description: Control one or more lights based upon BambuLab X1C/P1S 3D printer
   domain: automation
   input:
-    printer_online:
-      name: Printer Online
+    online:
+      name: Online
       description: Select the printer online state binary sensor.
       selector:
         entity:
@@ -18,9 +18,9 @@ blueprint:
                 - binary_sensor
               integration: bambu_lab
           multiple: false
-    printer_status:
-      name: Printing Status
-      description: Select the print status entity.
+    print_status:
+      name: Print Status
+      description: Select the print_status entity.
       selector:
         entity:
           filter:
@@ -28,9 +28,9 @@ blueprint:
                 - sensor
               integration: bambu_lab
           multiple: false
-    printer_stage:
-      name: Print Stage
-      description: Select the printer current stage entity.
+    current_stage:
+      name: Current Stage
+      description: Select the printer current_stage entity.
       selector:
         entity:
           filter:
@@ -38,9 +38,9 @@ blueprint:
                 - sensor
               integration: bambu_lab
           multiple: false
-    printer_chamber_light:
+    chamber_light:
       name: Internal Chamber Light
-      description: Select the printer chamber light.
+      description: Select the printer chamber_light entity
       selector:
         entity:
           filter:
@@ -62,28 +62,28 @@ triggers:
   - alias: Trigger whenever printer stage, status, chamber light, or online state changes
     trigger: state
     entity_id:
-      - !input printer_online
-      - !input printer_status
-      - !input printer_stage
-      - !input printer_chamber_light
+      - !input online
+      - !input print_status
+      - !input current_stage
+      - !input chamber_light
 
 action:
-  - variables:
-      chamber_lights:
-        - !input printer_chamber_light
+  - alias: "set variables"
+    variables:
+      chamber_light: !input chamber_light
   #  - delay: "00:00:05"
   - choose:
       - alias: Printer is offline, check again in 15secs and if so, turn lights off
         conditions:
           condition: state
-          entity_id: !input printer_online
+          entity_id: !input online
           state: "off"
         sequence:
           - delay: "00:00:15"
           - if:
               - alias: Printer offline after 15 seconds
                 condition: state
-                entity_id: !input printer_online
+                entity_id: !input online
                 state: "off"
                 for: "00:00:10"
             then:
@@ -94,7 +94,7 @@ action:
       - alias: LIDAR is on, turn off chamber light
         conditions:
           condition: state
-          entity_id: !input printer_stage
+          entity_id: !input current_stage
           state:
             - scanning_bed_surface
             - cleaning_nozzle_tip
@@ -107,7 +107,7 @@ action:
         # Originally red-blink (255,0,0,0,Blink)
         conditions:
           condition: state
-          entity_id: !input printer_stage
+          entity_id: !input current_stage
           state:
             - m400_pause
             - paused_chamber_temperature_control_error
@@ -128,42 +128,42 @@ action:
         # Originally fuscia-oscillate (255,0,195,200,Oscillate)
         conditions:
           condition: state
-          entity_id: !input printer_stage
+          entity_id: !input print_status
           state:
             - idle
         sequence:
-          - action: light.turn_on
+          - action: light.{{ (states(chamber_light) == 'on') | iif('turn_on', 'turn_off') }}
             target:
               entity_id: !input target_lights
       - alias: Print finished, lights follow chamber light
         # Originally green-solid (0,255,0,255,Solid)
         conditions:
           condition: state
-          entity_id: !input printer_stage
+          entity_id: !input print_status
           state:
             - finish
         sequence:
-          - action: light.turn_on
+          - action: light.{{ (states(chamber_light) == 'on') | iif('turn_on', 'turn_off') }}
             target:
               entity_id: !input target_lights
       - alias: Printing or AMS loading/unloading, lights follow chamber light
         # Originally white-solid (255,255,255,255,Solid)
         conditions:
           condition: state
-          entity_id: !input printer_stage
+          entity_id: !input current_stage
           state:
             - printing
             - filament_unloading
             - filament_loading
         sequence:
-          - action: light.turn_on
+          - action: light.{{ (states(chamber_light) == 'on') | iif('turn_on', 'turn_off') }}
             target:
               entity_id: !input target_lights
       - alias: Printing paused, lights on, ignore chamber light
         # Originally green-blink (0,255,0,255,Blink)
         conditions:
           condition: state
-          entity_id: !input printer_status
+          entity_id: !input print_status
           state: pause
         sequence:
           - action: light.turn_on
@@ -173,22 +173,22 @@ action:
         # Originally blue-blink (0,0,255,255,Blink)
         conditions:
           condition: state
-          entity_id: !input printer_stage
+          entity_id: !input current_stage
           state:
             - auto_bed_leveling
         sequence:
-          - action: light.turn_on
+          - action: light.{{ (states(chamber_light) == 'on') | iif('turn_on', 'turn_off') }}
             target:
               entity_id: !input target_lights
       - alias: Bed preheating, lights follow chamber light
         # Originally yellow-blink (255,169,0,255,Blink)
         conditions:
           condition: state
-          entity_id: !input printer_stage
+          entity_id: !input current_stage
           state:
             - heatbed_preheating
             - heating_hotend
         sequence:
-          - action: light.turn_on
+          - action: light.{{ (states(chamber_light) == 'on') | iif('turn_on', 'turn_off') }}
             target:
               entity_id: !input target_lights
