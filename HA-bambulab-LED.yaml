@@ -57,6 +57,14 @@ blueprint:
             - domain:
                 - light
           multiple: true
+#    target_has_rgbw:
+#      name: Do target lights take RGB and whiteness data?
+#      selector:
+#        boolean:
+#    target_has_effects:
+#      name: Do target lights have LED running effects?
+#      selector:
+#        boolean:
 
 triggers:
   - alias: Trigger whenever printer stage, status, chamber light, or online state changes
@@ -71,7 +79,10 @@ action:
   - alias: "set variables"
     variables:
       chamber_light: !input chamber_light
-  #  - delay: "00:00:05"
+      target_lights: !input target_lights
+#      target_has_rgbw: !input target_has_rgbw
+#      target_has_effects: !input target_has_effects
+#  - delay: "00:00:05"
   - choose:
       - alias: Printer is offline, check again in 15secs and if so, turn lights off
         conditions:
@@ -91,20 +102,23 @@ action:
                 action: light.turn_off
                 target:
                   entity_id: !input target_lights
-      - alias: LIDAR is on, turn off chamber light
+      - alias: LIDAR is on, turn off target lights
+        # XXX ideally we should also turn off the chamber light here in case it's also too bright, but we'd get an interaction with the trigger)
         conditions:
           condition: state
           entity_id: !input current_stage
           state:
-            - scanning_bed_surface
-            - cleaning_nozzle_tip
             - calibrating_extrusion
+            - calibrating_extrusion_flow
+            - calibrating_micro_lidar
+            - cleaning_nozzle_tip
+            - inspecting_first_layer
+            - scanning_bed_surface
         sequence:
           action: light.turn_off
           target:
             entity_id: !input target_lights
-      - alias: Printer needs attention, lights on
-        # Originally red-blink (255,0,0,0,Blink)
+      - alias: Printer needs attention, lights on (red-blink)
         conditions:
           condition: state
           entity_id: !input current_stage
@@ -124,8 +138,14 @@ action:
           - action: light.turn_on
             target:
               entity_id: !input target_lights
-      - alias: Printer idle, lights follow chamber light
-        # Originally fuscia-oscillate (255,0,195,200,Oscillate)
+#            data:
+#              rgb_color:
+#                - 255
+#                - 0
+#                - 0
+#              brightness: 100
+#              effect: Blink
+      - alias: Printer idle, lights follow chamber light (fuchsia-oscillate)
         conditions:
           condition: state
           entity_id: !input print_status
@@ -135,8 +155,14 @@ action:
           - action: light.{{ (states(chamber_light) == 'on') | iif('turn_on', 'turn_off') }}
             target:
               entity_id: !input target_lights
-      - alias: Print finished, lights follow chamber light
-        # Originally green-solid (0,255,0,255,Solid)
+ #           data:
+ #             rgb_color:
+ #               - 255
+ #               - 0
+ #               - 195
+ #             brightness: 100
+ #             effect: Oscillate
+      - alias: Print finished, lights follow chamber light (green-solid)
         conditions:
           condition: state
           entity_id: !input print_status
@@ -146,8 +172,30 @@ action:
           - action: light.{{ (states(chamber_light) == 'on') | iif('turn_on', 'turn_off') }}
             target:
               entity_id: !input target_lights
-      - alias: Printing or AMS loading/unloading, lights follow chamber light
-        # Originally white-solid (255,255,255,255,Solid)
+#            data:
+#              rgb_color:
+#                - 0
+#                - 255
+#                - 0
+#              brightness: 100
+#              effect: Solid
+      - alias: Printing paused, lights on, ignore chamber light (green-blink)
+        conditions:
+          condition: state
+          entity_id: !input print_status
+          state: pause
+        sequence:
+          - action: light.turn_on
+            target:
+              entity_id: !input target_lights
+#            data:
+#              rgb_color:
+#                - 0
+#                - 255
+#                - 0
+#              brightness: 100
+#              effect: Blink
+      - alias: Printing or AMS loading/unloading, lights follow chamber light (white-solid)
         conditions:
           condition: state
           entity_id: !input current_stage
@@ -159,18 +207,14 @@ action:
           - action: light.{{ (states(chamber_light) == 'on') | iif('turn_on', 'turn_off') }}
             target:
               entity_id: !input target_lights
-      - alias: Printing paused, lights on, ignore chamber light
-        # Originally green-blink (0,255,0,255,Blink)
-        conditions:
-          condition: state
-          entity_id: !input print_status
-          state: pause
-        sequence:
-          - action: light.turn_on
-            target:
-              entity_id: !input target_lights
-      - alias: Automatic Bed Leveling, lights follow chamber light
-        # Originally blue-blink (0,0,255,255,Blink)
+#            data:
+#              rgb_color:
+#                - 255
+#                - 255
+#                - 255
+#              brightness: 100
+#              effect: Solid
+      - alias: Automatic Bed Leveling, lights follow chamber light (blue solid)
         conditions:
           condition: state
           entity_id: !input current_stage
@@ -180,8 +224,14 @@ action:
           - action: light.{{ (states(chamber_light) == 'on') | iif('turn_on', 'turn_off') }}
             target:
               entity_id: !input target_lights
-      - alias: Bed preheating, lights follow chamber light
-        # Originally yellow-blink (255,169,0,255,Blink)
+#            data:
+#              rgb_color:
+#                - 0
+#                - 0
+#                - 255
+#              brightness: 100
+#              effect: Solid
+      - alias: Bed preheating, lights follow chamber light (yellow-solid)
         conditions:
           condition: state
           entity_id: !input current_stage
@@ -192,3 +242,10 @@ action:
           - action: light.{{ (states(chamber_light) == 'on') | iif('turn_on', 'turn_off') }}
             target:
               entity_id: !input target_lights
+#            data:
+#              rgb_color:
+#                - 255
+#                - 169
+#                - 0
+#              brightness: 100
+#              effect: Solid
