@@ -104,6 +104,7 @@ action:
           target:
             entity_id: !input target_lights
       - alias: Printer needs attention, lights on
+        # Originally red-blink (255,0,0,0,Blink)
         conditions:
           condition: state
           entity_id: !input printer_stage
@@ -124,17 +125,29 @@ action:
             target:
               entity_id: !input target_lights
       - alias: Printer idle, lights follow chamber light
+        # Originally fuscia-oscillate (255,0,195,200,Oscillate)
         conditions:
           condition: state
           entity_id: !input printer_stage
           state:
             - idle
+        sequence:
+          - action: light.turn_on
+            target:
+              entity_id: !input target_lights
+      - alias: Print finished, lights follow chamber light
+        # Originally green-solid (0,255,0,255,Solid)
+        conditions:
+          condition: state
+          entity_id: !input printer_stage
+          state:
             - finish
         sequence:
           - action: light.turn_on
             target:
               entity_id: !input target_lights
       - alias: Printing or AMS loading/unloading, lights follow chamber light
+        # Originally white-solid (255,255,255,255,Solid)
         conditions:
           condition: state
           entity_id: !input printer_stage
@@ -147,6 +160,7 @@ action:
             target:
               entity_id: !input target_lights
       - alias: Printing paused, lights on, ignore chamber light
+        # Originally green-blink (0,255,0,255,Blink)
         conditions:
           condition: state
           entity_id: !input printer_status
@@ -155,12 +169,23 @@ action:
           - action: light.turn_on
             target:
               entity_id: !input target_lights
-      - alias: Automatic Bed Leveling, or bed preheating, lights follow chamber light
+      - alias: Automatic Bed Leveling, lights follow chamber light
+        # Originally blue-blink (0,0,255,255,Blink)
         conditions:
           condition: state
           entity_id: !input printer_stage
           state:
             - auto_bed_leveling
+        sequence:
+          - action: light.turn_on
+            target:
+              entity_id: !input target_lights
+      - alias: Bed preheating, lights follow chamber light
+        # Originally yellow-blink (255,169,0,255,Blink)
+        conditions:
+          condition: state
+          entity_id: !input printer_stage
+          state:
             - heatbed_preheating
             - heating_hotend
         sequence:
