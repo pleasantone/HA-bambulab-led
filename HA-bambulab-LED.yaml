@@ -1,4 +1,4 @@
-# source_url: https://gist.github.com/dreed47/b33a76472cc813f7bf48a63c3dde7dce
+source_url: https://github.com/pleasantone/HA-bambulab-led/blob/main/blueprints/led_controller.yaml
 alias: Bambu Lab External Light Controller
 description: Control additional lights based on printer status
 mode: restart
@@ -111,7 +111,6 @@ action:
             - calibrating_extrusion
             - calibrating_extrusion_flow
             - calibrating_micro_lidar
-            - cleaning_nozzle_tip
             - inspecting_first_layer
             - scanning_bed_surface
         sequence:
@@ -139,11 +138,8 @@ action:
             target:
               entity_id: !input target_lights
 #            data:
-#              rgb_color:
-#                - 255
-#                - 0
-#                - 0
-#              brightness: 100
+#              rgb_color: [255, 0, 0]
+#              brightness_pct: 100
 #              effect: Blink
       - alias: Printer idle, lights follow chamber light (fuchsia-oscillate)
         conditions:
@@ -156,11 +152,8 @@ action:
             target:
               entity_id: !input target_lights
  #           data:
- #             rgb_color:
- #               - 255
- #               - 0
- #               - 195
- #             brightness: 100
+ #             rgb_color: [255, 0, 195]
+ #             brightness_pct: 100
  #             effect: Oscillate
       - alias: Print finished, lights follow chamber light (green-solid)
         conditions:
@@ -173,11 +166,8 @@ action:
             target:
               entity_id: !input target_lights
 #            data:
-#              rgb_color:
-#                - 0
-#                - 255
-#                - 0
-#              brightness: 100
+#              rgb_color: [0, 255, 0]
+#              brightness_pct: 100
 #              effect: Solid
       - alias: Printing paused, lights on, ignore chamber light (green-blink)
         conditions:
@@ -189,11 +179,8 @@ action:
             target:
               entity_id: !input target_lights
 #            data:
-#              rgb_color:
-#                - 0
-#                - 255
-#                - 0
-#              brightness: 100
+#              rgb_color: [0, 255, 0]
+#              brightness_pct: 100
 #              effect: Blink
       - alias: Printing or AMS loading/unloading, lights follow chamber light (white-solid)
         conditions:
@@ -208,11 +195,8 @@ action:
             target:
               entity_id: !input target_lights
 #            data:
-#              rgb_color:
-#                - 255
-#                - 255
-#                - 255
-#              brightness: 100
+#              rgb_color: [255, 255, 255]
+#              brightness_pct: 100
 #              effect: Solid
       - alias: Automatic Bed Leveling, lights follow chamber light (blue solid)
         conditions:
@@ -225,11 +209,8 @@ action:
             target:
               entity_id: !input target_lights
 #            data:
-#              rgb_color:
-#                - 0
-#                - 0
-#                - 255
-#              brightness: 100
+#              rgb_color: [0, 0, 255]
+#              brightness_pct: 100
 #              effect: Solid
       - alias: Bed preheating, lights follow chamber light (yellow-solid)
         conditions:
@@ -243,9 +224,10 @@ action:
             target:
               entity_id: !input target_lights
 #            data:
-#              rgb_color:
-#                - 255
-#                - 169
-#                - 0
-#              brightness: 100
+#              rgb_color: [255, 169, 0]
+#              brightness_pct: 100
 #              effect: Solid
+    default:
+      - action: light.{{ (states(chamber_light) == 'on') | iif('turn_on', 'turn_off') }}
+        target:
+          entity_id: !input target_lights
