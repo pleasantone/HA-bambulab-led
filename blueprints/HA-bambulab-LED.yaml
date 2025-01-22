@@ -5,7 +5,7 @@ mode: restart
 blueprint:
   name: Bambu Lab External Light Controller
   description: Control one or more lights based upon Bambu Lab X1C/P1S 3D printer
-  source_url: https://github.com/pleasantone/HA-bambulab-led/blob/main/blueprints/led_controller.yaml
+  source_url: https://github.com/pleasantone/HA-bambulab-led/blob/main/blueprints/HA-bambulab-LED.yaml
   domain: automation
   input:
     online:
