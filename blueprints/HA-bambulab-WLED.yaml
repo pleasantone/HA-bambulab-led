@@ -1,0 +1,279 @@
+alias: Bambu Lab WLED/LED Light Controller
+description: Control additional lights based on printer status
+mode: restart
+
+blueprint:
+  name: Bambu Lab External Light Controller
+  description: Control one or more lights based upon Bambu Lab X1C/P1S 3D printer
+  source_url: https://github.com/pleasantone/HA-bambulab-led/blob/main/blueprints/HA-bambulab-WLED.yaml
+  domain: automation
+  input:
+    online:
+      name: Online
+      description: Select the printer online state binary sensor.
+      selector:
+        entity:
+          filter:
+            - domain:
+                - binary_sensor
+              integration: bambu_lab
+          multiple: false
+    print_status:
+      name: Print Status
+      description: Select the print_status entity.
+      selector:
+        entity:
+          filter:
+            - domain:
+                - sensor
+              integration: bambu_lab
+          multiple: false
+    current_stage:
+      name: Current Stage
+      description: Select the printer current_stage entity.
+      selector:
+        entity:
+          filter:
+            - domain:
+                - sensor
+              integration: bambu_lab
+          multiple: false
+    chamber_light:
+      name: Internal Chamber Light
+      description: Select the printer chamber_light entity
+      selector:
+        entity:
+          filter:
+            - domain:
+                - light
+              integration: bambu_lab
+          multiple: false
+    target_lights:
+      name: Switched External Lights
+      description: Select the lights you wish to control.
+      selector:
+        entity:
+          filter:
+            - domain:
+                - light
+
+triggers:
+  - alias: Trigger whenever printer stage, status, chamber light, or online state changes
+    trigger: state
+    entity_id:
+      - !input online
+      - !input print_status
+      - !input current_stage
+      - !input chamber_light
+
+action:
+  - alias: "set variables"
+    variables:
+      chamber_light: !input chamber_light
+      target_lights: !input target_lights
+      online: !input online
+      print_status: !input print_status
+      current_stage: !input current_stage
+  - delay: "00:00:05"
+  - choose:
+      - alias: Printer is offline, check again in 15secs and if so, turn lights off
+        conditions:
+          condition: state
+          entity_id: !input online
+          state: "off"
+        sequence:
+          - delay: "00:00:15"
+          - if:
+              - alias: Printer offline after 15 seconds
+                condition: state
+                entity_id: !input online
+                state: "off"
+                for: "00:00:10"
+            then:
+              - alias: Turn LED lights off, ignore chamber light
+                action: light.turn_off
+                target:
+                  entity_id: !input target_lights
+      - alias: LIDAR is on, target lights off, ignore chamber light
+        conditions:
+          condition: state
+          entity_id: !input current_stage
+          state:
+            - calibrating_extrusion
+            - calibrating_extrusion_flow
+            - calibrating_micro_lidar
+            - inspecting_first_layer
+            - scanning_bed_surface
+            - cleaning_nozzle_tip
+        sequence:
+          - action: system_log.write
+            data:
+              level: debug
+              logger: wled_debug
+              message: "WLED force light off: {{ states(current_stage) }} {{ states(print_status) }}"
+          - action: light.turn_off
+            target:
+              entity_id: !input target_lights
+      - alias: Printer needs attention, target lights on, ignore chamber light (red-blink)
+        conditions:
+          condition: state
+          entity_id: !input current_stage
+          state:
+            - m400_pause
+            - paused_chamber_temperature_control_error
+            - paused_cutter_error
+            - paused_filament_runout
+            - paused_first_layer_error
+            - paused_front_cover_failing
+            - paused_heat_bed_temperature_malfunction
+            - paused_low_fan_speed_heat_break
+            - paused_nozzle_clog
+            - paused_nozzle_filament_covered_detected
+            - paused_nozzle_temperature_malfunction
+        sequence:
+          - action: system_log.write
+            data:
+              level: debug
+              logger: wled_debug
+              message: "WLED pause error: {{ states(current_stage) }} {{ states(print_status) }}"
+          - action: light.turn_on
+            target:
+              entity_id: !input target_lights
+            data:
+              rgb_color: [255, 0, 0]
+              brightness_pct: 100
+              effect: Blink
+      - alias: Printing paused, lights on, ignore chamber light (green-blink)
+        conditions:
+          condition: state
+          entity_id: !input print_status
+          state: pause
+        sequence:
+          - action: system_log.write
+            data:
+              level: debug
+              logger: wled_debug
+              message: "WLED pause other: {{ states(current_stage) }} {{ states(print_status) }}"
+          - action: light.turn_on
+            target:
+              entity_id: !input target_lights
+            data:
+              rgb_color: [0, 255, 0]
+              brightness_pct: 100
+              effect: Blink
+      - alias: Chamber light is off, target lights off
+        conditions:
+          condition: state
+          entity_id: !input chamber_light
+          state: "off"
+        sequence:
+          - action: system_log.write
+            data:
+              level: debug
+              logger: wled_debug
+              message: "WLED chamber light off"
+          - action: light.turn_off
+            target:
+              entity_id: !input target_lights
+      - alias: Printer idle, lights follow chamber light (fuchsia-oscillate)
+        conditions:
+          condition: state
+          entity_id: !input print_status
+          state:
+            - idle
+        sequence:
+          - action: system_log.write
+            data:
+              level: debug
+              logger: wled_debug
+              message: "WLED printer idle: {{ states(current_stage) }} {{ states(print_status) }}"
+          - action: light.turn_on
+            target:
+              entity_id: !input target_lights
+            data:
+              rgb_color: [255, 0, 195]
+              brightness_pct: 100
+              effect: Oscillate
+      - alias: Print finished, lights follow chamber light (green-solid)
+        conditions:
+          condition: state
+          entity_id: !input print_status
+          state:
+            - finish
+        sequence:
+          - action: system_log.write
+            data:
+              level: debug
+              logger: wled_debug
+              message: "WLED print finished: {{ states(current_stage) }} {{ states(print_status) }}"
+          - action: light.turn_on
+            target:
+              entity_id: !input target_lights
+            data:
+              rgb_color: [0, 255, 0]
+              brightness_pct: 100
+              effect: Solid
+      - alias: Printing or AMS loading/unloading, lights follow chamber light (white-solid)
+        conditions:
+          condition: state
+          entity_id: !input current_stage
+          state:
+            - printing
+            - filament_unloading
+            - filament_loading
+        sequence:
+          - action: system_log.write
+            data:
+              level: debug
+              logger: wled_debug
+              message: "WLED printing/AMS movement: {{ states(current_stage) }} {{ states(print_status) }}"
+          - action: light.turn_on
+            target:
+              entity_id: !input target_lights
+            data:
+              rgb_color: [255, 255, 255]
+              brightness_pct: 100
+              effect: Solid
+      - alias: Automatic Bed Leveling, lights follow chamber light (blue solid)
+        conditions:
+          condition: state
+          entity_id: !input current_stage
+          state:
+            - auto_bed_leveling
+        sequence:
+          - action: system_log.write
+            data:
+              level: debug
+              logger: wled_debug
+              message: "WLED bed leveling: {{ states(current_stage) }} {{ states(print_status) }}"
+          - action: light.turn_on
+            target:
+              entity_id: !input target_lights
+            data:
+              rgb_color: [0, 0, 255]
+              brightness_pct: 100
+              effect: Solid
+      - alias: Bed preheating, lights follow chamber light (yellow-solid, dim)
+        conditions:
+          condition: state
+          entity_id: !input current_stage
+          state:
+            - heatbed_preheating
+            - heating_hotend
+        sequence:
+          - action: system_log.write
+            data:
+              level: debug
+              logger: wled_debug
+              message: "WLED bed preheat: {{ states(current_stage) }} {{ states(print_status) }}"
+          - action: light.turn_on
+            target:
+              entity_id: !input target_lights
+            data:
+              rgb_color: [255, 169, 0]
+              brightness_pct: 30
+              effect: Solid
+    default:
+      - action: light.{{ (states(chamber_light) == 'on') | iif('turn_on', 'turn_off') }}
+        target:
+          entity_id: !input target_lights
