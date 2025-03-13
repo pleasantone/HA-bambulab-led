@@ -5,7 +5,7 @@ mode: restart
 blueprint:
   name: Bambu Lab External Light Controller
   description: Control one or more lights based upon Bambu Lab X1C/P1S 3D printer
-  source_url: https://github.com/pleasantone/HA-bambulab-led/blob/main/blueprints/pleasantone/HA-bambulab-WLED.yaml
+  source_url: https://github.com/pleasantone/HA-bambulab-led/blob/main/blueprints/automation/pleasantone/HA-bambulab-WLED.yaml
   domain: automation
   input:
     online:
@@ -59,12 +59,24 @@ blueprint:
 
 triggers:
   - alias: Trigger whenever printer stage, status, chamber light, or online state changes
+    id: "printer_status"
     trigger: state
     entity_id:
       - !input online
       - !input print_status
       - !input current_stage
-      - !input chamber_light
+  - alias: Trigger whenever chamber lights change state from off to on
+    id: "chamber_light_on"
+    trigger: state
+    entity_id: !input chamber_light
+    to: "on"
+    from: "off"
+  - alias: Trigger whenever chamber lights change state from on to off
+    id: "chamber_light_off"
+    trigger: state
+    entity_id: !input chamber_light
+    to: "off"
+    from: "on"
 
 action:
   - alias: "set variables"
@@ -74,7 +86,6 @@ action:
       online: !input online
       print_status: !input print_status
       current_stage: !input current_stage
-  - delay: "00:00:05"
   - choose:
       - alias: Printer is offline, check again in 15secs and if so, turn lights off
         conditions:
@@ -94,11 +105,11 @@ action:
                 action: light.turn_off
                 target:
                   entity_id: !input target_lights
-          - action: system_log.write
-            data:
-              level: debug
-              logger: wled_debug
-              message: "printer offline: stage {{ states(current_stage) }} status {{ states(print_status) }} state {{ states(online) }}"
+              - action: system_log.write
+                data:
+                  level: debug
+                  logger: wled_debug
+                  message: "printer offline: stage {{ states(current_stage) }} status {{ states(print_status) }} state {{ states(online) }}"
       - alias: LIDAR is on, target lights off, ignore chamber light
         conditions:
           condition: state
@@ -180,6 +191,23 @@ action:
           - action: light.turn_off
             target:
               entity_id: !input target_lights
+      - alias: Chamber light was turned from off to on, white target lights
+        conditions:
+          condition: trigger
+          id: "chamber_light_on"
+        sequence:
+          - action: system_log.write
+            data:
+              level: debug
+              logger: wled_debug
+              message: "chamber light turned on: stage {{ states(current_stage) }} status: {{ states(print_status) }} chamber: {{ states(chamber_light) }}"
+          - action: light.turn_on
+            target:
+              entity_id: !input target_lights
+            data:
+              rgb_color: [255, 255, 255]
+              brightness_pct: 100
+              effect: Solid
       - alias: Printer idle, lights follow chamber light (fuchsia-oscillate)
         conditions:
           condition: state
@@ -197,10 +225,8 @@ action:
               entity_id: !input target_lights
             data:
               brightness_pct: 100
-              rgb_color: [255,255,255]
-              effect: Solid
-#             rgb_color: [255, 0, 195]
-#             effect: Oscillate
+              rgb_color: [255, 0, 195]
+              effect: Oscillate
       - alias: Print finished, lights follow chamber light (green-solid)
         conditions:
           condition: state
