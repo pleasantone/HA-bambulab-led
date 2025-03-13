@@ -5,7 +5,7 @@ mode: restart
 blueprint:
   name: Bambu Lab External Light Controller
   description: Control one or more lights based upon Bambu Lab X1C/P1S 3D printer
-  source_url: https://github.com/pleasantone/HA-bambulab-led/blob/main/blueprints/automation/pleasantone/HA-bambulab-WLED.yaml
+  source_url: https://github.com/pleasantone/HA-bambulab-led/blob/main/blueprints/HA-bambulab-WLED.yaml
   domain: automation
   input:
     online:
@@ -101,15 +101,15 @@ action:
                 state: "off"
                 for: "00:00:10"
             then:
-              - alias: Turn LED lights off, ignore chamber light
-                action: light.turn_off
-                target:
-                  entity_id: !input target_lights
               - action: system_log.write
                 data:
                   level: debug
                   logger: wled_debug
                   message: "printer offline: stage {{ states(current_stage) }} status {{ states(print_status) }} state {{ states(online) }}"
+              - alias: Turn LED lights off, ignore chamber light
+                action: light.turn_off
+                target:
+                  entity_id: !input target_lights
       - alias: LIDAR is on, target lights off, ignore chamber light
         conditions:
           condition: state
