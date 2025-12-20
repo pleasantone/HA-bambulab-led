@@ -91,14 +91,20 @@ action:
         conditions:
           condition: state
           entity_id: !input online
-          state: "off"
+          state:
+            - "off"
+            - "unknown"
+            - "unavailable"
         sequence:
           - delay: "00:00:15"
           - if:
               - alias: Printer offline after 15 seconds
                 condition: state
                 entity_id: !input online
-                state: "off"
+                state:
+                  - "off"
+                  - "unknown"
+                  - "unavailable"
                 for: "00:00:10"
             then:
               - action: system_log.write
@@ -135,7 +141,7 @@ action:
           condition: state
           entity_id: !input current_stage
           state:
-            - m400_pause
+#            - m400_pause
             - paused_chamber_temperature_control_error
             - paused_cutter_error
             - paused_filament_runout
@@ -174,9 +180,9 @@ action:
             target:
               entity_id: !input target_lights
             data:
-              rgb_color: [0, 255, 0]
+              rgb_color: [255, 255, 255]
               brightness_pct: 100
-              effect: Blink
+              effect: Solid
       - alias: Chamber light is off, target lights off
         conditions:
           condition: state
@@ -225,8 +231,8 @@ action:
               entity_id: !input target_lights
             data:
               brightness_pct: 100
-              rgb_color: [255, 0, 195]
-              effect: Oscillate
+              rgb_color: [255, 255, 255]
+              effect: Solid
       - alias: Print finished, lights follow chamber light (green-solid)
         conditions:
           condition: state
@@ -243,7 +249,7 @@ action:
             target:
               entity_id: !input target_lights
             data:
-              rgb_color: [0, 255, 0]
+              rgb_color: [255, 255, 255]
               brightness_pct: 100
               effect: Solid
       - alias: Printing or AMS loading/unloading, lights follow chamber light (white-solid)
@@ -314,4 +320,4 @@ action:
         data:
           level: debug
           logger: wled_debug
-          message: "default: stage {{ states(current_stage) }},, status {{ states(print_status) }}, chamber {{ states(chamber_light) }}, target {{ states(target_lights) }}"
+          message: "default: stage {{ states(current_stage) }}, status {{ states(print_status) }}, chamber {{ states(chamber_light) }}, target {{ states(target_lights) }}"
