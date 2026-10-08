@@ -155,7 +155,7 @@ action:
             - paused_cutter_error
             - paused_filament_runout
             - paused_first_layer_error
-            - paused_front_cover_failing
+            - paused_front_cover_falling
             - paused_heat_bed_temperature_malfunction
             - paused_low_fan_speed_heat_break
             - paused_nozzle_clog
