@@ -136,6 +136,11 @@ action:
             - inspecting_first_layer
             - scanning_bed_surface
             - cleaning_nozzle_tip
+            - identifying_build_plate_type
+            - measuring_surface
+            - heatbed_surface_foreign_object_detection
+            - heatbed_underside_foreign_object_detection
+            - build_plate_alignment_detection
         sequence:
           - action: system_log.write
             data:
@@ -151,6 +156,7 @@ action:
           entity_id: !input current_stage
           state:
 #            - m400_pause
+            - paused_ams_lost
             - paused_chamber_temperature_control_error
             - paused_cutter_error
             - paused_filament_runout
@@ -161,6 +167,7 @@ action:
             - paused_nozzle_clog
             - paused_nozzle_filament_covered_detected
             - paused_nozzle_temperature_malfunction
+            - paused_skipped_step
         sequence:
           - action: system_log.write
             data:
@@ -174,6 +181,24 @@ action:
               rgb_color: [255, 0, 0]
               brightness_pct: 100
               effect: Blink
+      - alias: Print failed, target lights on, ignore chamber light (red-solid)
+        conditions:
+          condition: state
+          entity_id: !input print_status
+          state: failed
+        sequence:
+          - action: system_log.write
+            data:
+              level: debug
+              logger: wled_debug
+              message: "print failed: stage {{ states(current_stage) }} status {{ states(print_status) }}"
+          - action: light.turn_on
+            target:
+              entity_id: !input target_lights
+            data:
+              rgb_color: [255, 0, 0]
+              brightness_pct: 100
+              effect: Solid
       - alias: Printing paused, lights on, ignore chamber light (white-solid)
         conditions:
           condition: state
@@ -288,6 +313,9 @@ action:
           entity_id: !input current_stage
           state:
             - auto_bed_leveling
+            - bed_level_phase_1
+            - bed_level_phase_2
+            - bed_level_high_temperature
         sequence:
           - action: system_log.write
             data:
@@ -301,19 +329,23 @@ action:
               rgb_color: [0, 0, 255]
               brightness_pct: 100
               effect: Solid
-      - alias: Bed preheating, lights follow chamber light (amber-solid, dim)
+      - alias: Heating up (bed, hotend or chamber), lights follow chamber light (amber-solid, dim)
         conditions:
           condition: state
           entity_id: !input current_stage
           state:
             - heatbed_preheating
             - heating_hotend
+            - waiting_for_heatbed_temperature
+            - heating_chamber
+            - waiting_chamber_temperature_equalize
+            - thermal_preconditioning
         sequence:
           - action: system_log.write
             data:
               level: debug
               logger: wled_debug
-              message: "bed preheat: stage {{ states(current_stage) }}"
+              message: "heating up: stage {{ states(current_stage) }}"
           - action: light.turn_on
             target:
               entity_id: !input target_lights
