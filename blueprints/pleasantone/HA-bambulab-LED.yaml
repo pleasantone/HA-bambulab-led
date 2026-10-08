@@ -102,7 +102,7 @@ action:
                 action: light.turn_off
                 target:
                   entity_id: !input target_lights
-      - alias: LIDAR is on, turn off target lights
+      - alias: LIDAR scan or calibration running, target lights off
         # XXX ideally we should also turn off the chamber light here in case it's also too bright, but we'd get an interaction with the trigger)
         conditions:
           condition: state
@@ -117,7 +117,7 @@ action:
           action: light.turn_off
           target:
             entity_id: !input target_lights
-      - alias: Printer needs attention, lights on (red-blink)
+      - alias: Printer needs attention, target lights on, ignore chamber light
         conditions:
           condition: state
           entity_id: !input current_stage
@@ -141,7 +141,7 @@ action:
 #              rgb_color: [255, 0, 0]
 #              brightness_pct: 100
 #              effect: Blink
-      - alias: Printer idle, lights follow chamber light (fuchsia-oscillate)
+      - alias: Printer idle, lights follow chamber light
         conditions:
           condition: state
           entity_id: !input print_status
@@ -155,7 +155,7 @@ action:
  #             rgb_color: [255, 0, 195]
  #             brightness_pct: 100
  #             effect: Oscillate
-      - alias: Print finished, lights follow chamber light (green-solid)
+      - alias: Print finished, lights follow chamber light
         conditions:
           condition: state
           entity_id: !input print_status
@@ -169,7 +169,7 @@ action:
 #              rgb_color: [0, 255, 0]
 #              brightness_pct: 100
 #              effect: Solid
-      - alias: Printing paused, lights on, ignore chamber light (green-blink)
+      - alias: Printing paused, target lights on, ignore chamber light
         conditions:
           condition: state
           entity_id: !input print_status
@@ -182,7 +182,7 @@ action:
 #              rgb_color: [0, 255, 0]
 #              brightness_pct: 100
 #              effect: Blink
-      - alias: Printing or AMS loading/unloading, lights follow chamber light (white-solid)
+      - alias: Printing or AMS loading/unloading, lights follow chamber light
         conditions:
           condition: state
           entity_id: !input current_stage
@@ -198,7 +198,7 @@ action:
 #              rgb_color: [255, 255, 255]
 #              brightness_pct: 100
 #              effect: Solid
-      - alias: Automatic Bed Leveling, lights follow chamber light (blue solid)
+      - alias: Automatic Bed Leveling, lights follow chamber light
         conditions:
           condition: state
           entity_id: !input current_stage
@@ -212,7 +212,7 @@ action:
 #              rgb_color: [0, 0, 255]
 #              brightness_pct: 100
 #              effect: Solid
-      - alias: Bed preheating, lights follow chamber light (yellow-solid)
+      - alias: Bed or hotend heating, lights follow chamber light
         conditions:
           condition: state
           entity_id: !input current_stage
