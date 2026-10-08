@@ -58,7 +58,7 @@ blueprint:
                 - light
 
 triggers:
-  - alias: Trigger whenever printer stage, status, chamber light, or online state changes
+  - alias: Trigger whenever printer stage, status, or online state changes
     id: "printer_status"
     trigger: state
     entity_id:
@@ -98,14 +98,23 @@ action:
         sequence:
           - delay: "00:00:15"
           - if:
+              # HA 2026.10 rejects a state condition that combines `for` with a list of
+              # states, so each offline state gets its own condition.
               - alias: Printer offline after 15 seconds
-                condition: state
-                entity_id: !input online
-                state:
-                  - "off"
-                  - "unknown"
-                  - "unavailable"
-                for: "00:00:10"
+                condition: or
+                conditions:
+                  - condition: state
+                    entity_id: !input online
+                    state: "off"
+                    for: "00:00:10"
+                  - condition: state
+                    entity_id: !input online
+                    state: "unknown"
+                    for: "00:00:10"
+                  - condition: state
+                    entity_id: !input online
+                    state: "unavailable"
+                    for: "00:00:10"
             then:
               - action: system_log.write
                 data:
@@ -116,7 +125,7 @@ action:
                 action: light.turn_off
                 target:
                   entity_id: !input target_lights
-      - alias: LIDAR is on, target lights off, ignore chamber light
+      - alias: LIDAR scan or calibration running, target lights off, ignore chamber light
         conditions:
           condition: state
           entity_id: !input current_stage
@@ -165,7 +174,7 @@ action:
               rgb_color: [255, 0, 0]
               brightness_pct: 100
               effect: Blink
-      - alias: Printing paused, lights on, ignore chamber light (green-blink)
+      - alias: Printing paused, lights on, ignore chamber light (white-solid)
         conditions:
           condition: state
           entity_id: !input print_status
@@ -214,7 +223,7 @@ action:
               rgb_color: [255, 255, 255]
               brightness_pct: 100
               effect: Solid
-      - alias: Printer idle, lights follow chamber light (fuchsia-oscillate)
+      - alias: Printer idle, lights follow chamber light (white-solid)
         conditions:
           condition: state
           entity_id: !input print_status
@@ -233,7 +242,7 @@ action:
               brightness_pct: 100
               rgb_color: [255, 255, 255]
               effect: Solid
-      - alias: Print finished, lights follow chamber light (green-solid)
+      - alias: Print finished, lights follow chamber light (white-solid)
         conditions:
           condition: state
           entity_id: !input print_status
@@ -273,7 +282,7 @@ action:
               rgb_color: [255, 255, 255]
               brightness_pct: 100
               effect: Solid
-      - alias: Automatic Bed Leveling, lights follow chamber light (blue solid)
+      - alias: Automatic Bed Leveling, lights follow chamber light (blue-solid)
         conditions:
           condition: state
           entity_id: !input current_stage
@@ -292,7 +301,7 @@ action:
               rgb_color: [0, 0, 255]
               brightness_pct: 100
               effect: Solid
-      - alias: Bed preheating, lights follow chamber light (yellow-solid, dim)
+      - alias: Bed preheating, lights follow chamber light (amber-solid, dim)
         conditions:
           condition: state
           entity_id: !input current_stage
